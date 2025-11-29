@@ -1,0 +1,2416 @@
+---
+title: Extraire tous les prospects potentielles de France pour des campagnes emails.
+description: Remplir un fichier client en partant de 0 pour contacter tous les prospects potentielles de France. 
+repository: chronark/chronark.com
+url: https://chronark.com
+date: 2023-03-28
+published: true
+---
+
+Quelle est la problématique ?
+-----------------------------
+
+La prospection commerciale peut vite devenir coûteuse et chronophage. Les abonnements aux bases de données de prospects sont souvent onéreux, et la constitution manuelle de fichiers est interminable.
+
+L'objectif est ici de pouvoir extraire et enrichir une base de données clients en moins d'une heure, en ciblant n'importe quel prospect en France, sans abonnement fixe, mais en payant uniquement à la donnée extraite (pay-as-you-go).
+
+### La Stack Technique
+
+Ce système repose sur l'orchestration de plusieurs outils performants et économiques :
+
+*   **n8n** : Pour l'automatisation des workflows (alternative plus flexible à Make ou Zapier).
+*   **Outscraper** : Une API puissante pour scraper des données depuis Google Maps, LinkedIn, etc.
+*   **NocoDB** : Pour stocker et organiser les données (base de données NoCode).
+*   **Brevo** : Pour la gestion des campagnes d'emailing.
+
+### Les Étapes du Workflow
+
+#### 1. Paramétrage et Extraction (Google Maps)
+
+Le processus commence par définir une liste de villes cibles (ex: Paris, Marseille, Lyon) et une requête spécifique (ex: "Hôtel").
+
+Le workflow boucle sur ces paramètres pour interroger Google Maps via Outscraper. Cela permet de récupérer les fiches entreprises correspondant à la recherche dans les zones géographiques définies.
+
+export const ScrapingWorkflow = 
+{
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1c82797d-4d24-4544-8178-00e7b1ee08bd",
+              "name": "ville",
+              "value": "Paris, Marseille, Lyon, Bordeaux, Lille",
+              "type": "string"
+            },
+            {
+              "id": "5c7f60cb-c68c-44c7-bee0-87979ace284d",
+              "name": "Request",
+              "value": "Hôtel",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2144,
+        352
+      ],
+      "id": "fdcca817-5325-45c8-9c48-0252cd64e206",
+      "name": "Edit Fields",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "ville",
+        "options": {
+          "disableDotNotation": true
+        }
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1696,
+        352
+      ],
+      "id": "61866ae4-6afe-41aa-ad74-7a022c443e5c",
+      "name": "Split Out",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "05c9ee62-2cc1-47f6-896b-5bca0b82376b",
+              "name": "ville",
+              "value": "={{ $json.ville.split(',') }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1904,
+        352
+      ],
+      "id": "6a6e8a34-3254-416b-b74f-505ec8a81c4c",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "05fa61fc-5671-4cfb-a6d1-1d91f2fec75f",
+              "leftValue": "={{ $json.site }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -832,
+        -48
+      ],
+      "id": "a00e0e15-0612-436d-bd20-e1647a7ce59a",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data[0]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        208
+      ],
+      "id": "c62ec54d-f5d9-41e4-9004-880eb6b8e199",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1024,
+        208
+      ],
+      "id": "e7ff4d20-ed51-4857-8523-39ac89b6a6a1",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -576,
+        -96
+      ],
+      "id": "4b375405-879f-457f-b3d3-2e0ee483344b",
+      "name": "Wait",
+      "webhookId": "330f9484-f811-4c96-8fcf-a035920945c4"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1472,
+        352
+      ],
+      "id": "cb5307ce-9fc0-4bf7-bff1-34ba4e7c2619",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "where": "=(Email,eq,{{ $json.data[0].emails[0].value }})"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        176,
+        -128
+      ],
+      "id": "41100b42-2bbd-4d98-bd30-fb76de436dc1",
+      "name": "Deduplicate",
+      "alwaysOutputData": true,
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "create",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Email",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].emails[0].value || null }}"
+            },
+            {
+              "fieldName": "URL",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].query || null }}"
+            },
+            {
+              "fieldName": "Description",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].site_data.description || null }}"
+            },
+            {
+              "fieldName": "Title",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].site_data.title || null }}"
+            },
+            {
+              "fieldName": "Linkedin",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].socials.linkedin || null }}"
+            },
+            {
+              "fieldName": "Facebook",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].socials.facebook || null }}"
+            },
+            {
+              "fieldName": "Instagram",
+              "fieldValue": "={{ $('Exctraction email telephone').item.json.data[0].socials.instagram || null}}"
+            },
+            {
+              "fieldName": "Adresse",
+              "fieldValue": "={{ $('Loop Over Items').item.json.full_address || null }}"
+            },
+            {
+              "fieldName": "Phone",
+              "fieldValue": "={{ $('Loop Over Items').item.json.phone }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        784,
+        -16
+      ],
+      "id": "1ea29179-a70b-444b-8b9b-340679f24057",
+      "name": "Cree prospect",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "number",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "1530f769-f5a2-4e7c-a86b-e74d32a685af"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exists"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "09ffff7b-fb57-4251-9205-d3c4727df073",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "={{ $json.id }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        -112
+      ],
+      "id": "7734f04c-ce05-4ec8-a2a5-ddb727d67e26",
+      "name": "Prospect existe deja ?"
+    },
+    {
+      "parameters": {
+        "resource": "emailsAndContacts",
+        "query": "={{ $json.site.extractDomain() }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-outscraper.outscraper",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -96
+      ],
+      "id": "be81c2c5-0bc4-4c7a-beb0-c359f448e7bd",
+      "name": "Exctraction email telephone",
+      "credentials": {
+        "outscraperApi": {
+          "id": "v7dioMFesa7DTxHF",
+          "name": "Outscraper account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data[0].emails[0].value }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "c051f8c4-4d3b-4e22-ba8a-d47d855dd374"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exists"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "eb65e6c4-798c-4da3-a8dd-69fdc6aeeb54",
+                    "leftValue": "={{ $json.data[0].emails[0].value }}",
+                    "rightValue": "={{ $json.data[0].emails.value[0] }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -112,
+        -80
+      ],
+      "id": "c776cd78-d643-4e5f-b94b-a78bbb0691f4",
+      "name": "Pas d'email ou telephone"
+    },
+    {
+      "parameters": {
+        "query": "={{ $('Edit Fields').item.json.Request }} {{ $json.ville }}",
+        "limit": 10,
+        "language": "fr",
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-outscraper.outscraper",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        416
+      ],
+      "id": "e2e9c945-68cf-48f3-8d3b-4d6f9374cc37",
+      "name": "Google maps scraper",
+      "credentials": {
+        "outscraperApi": {
+          "id": "v7dioMFesa7DTxHF",
+          "name": "Outscraper account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2368,
+        352
+      ],
+      "id": "e03c17b4-390b-4b70-aec8-e6d93731a515",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Exctraction email telephone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google maps scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate": {
+      "main": [
+        [
+          {
+            "node": "Prospect existe deja ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cree prospect": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prospect existe deja ?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cree prospect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exctraction email telephone": {
+      "main": [
+        [
+          {
+            "node": "Pas d'email ou telephone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pas d'email ou telephone": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google maps scraper": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0f60a08dfaa65cda43e89dccf2def56dace8ea615201c8a5843fb404fb52e58"
+  }
+}
+
+<N8nWorkflow data={ScrapingWorkflow} />
+
+
+#### 2. Enrichissement et Vérification des Données
+
+Une fois les entreprises identifiées, le système procède à plusieurs vérifications cruciales pour qualifier la donnée :
+
+*   **Vérification du domaine** : On s'assure que l'entreprise possède un site web et un nom de domaine valide.
+*   **Scraping de contacts** : Extraction des adresses emails et numéros de téléphone associés.
+*   **Validation des emails** : Une étape indispensable pour garantir la délivrabilité. Le système vérifie si l'email est valide pour éviter les "bounces" qui pourraient nuire à la réputation de votre domaine d'envoi.
+
+Si aucune adresse email valide n'est trouvée, le prospect est écarté pour ne pas polluer la base de données.
+
+export const Enrichissement =
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data[0].status }}",
+                    "rightValue": "=RECEIVING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    },
+                    "id": "ccfa8455-96b3-499c-abf2-9b8a4e36802a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalid"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b7327232-e749-436a-ba9e-2189f177412b",
+                    "leftValue": "={{ $json.data[0].status }}",
+                    "rightValue": "RECEIVING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "valid"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1232,
+        -64
+      ],
+      "id": "13ab17d8-f4aa-46ed-92a6-92417d4f1369",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        592,
+        -96
+      ],
+      "id": "b3dbb778-6c63-4dfa-a225-a95cde025cd4",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -96
+      ],
+      "id": "3101d3dd-c0c7-4bab-bbc3-a715115a95ef",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        256,
+        -96
+      ],
+      "id": "6b5552bf-ae04-4465-8277-87133392ecd8",
+      "name": "Get many rows",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Invalid",
+              "fieldValue": "true"
+            },
+            {
+              "fieldName": "=id",
+              "fieldValue": "={{ $('Get many rows').item.json.Id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        1504,
+        -96
+      ],
+      "id": "ec55225c-f63c-4021-a752-f9fdb5be6187",
+      "name": "Update a row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.outscraper.cloud/validators/email",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $json.Email }}"
+            },
+            {
+              "name": "async",
+              "value": "false"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "ZWYzNjU3YmZhYTQ2NDg1Y2IxZWZiMDViMDE4N2Y5OTB8YWU3MTJkYjY1MA"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        944,
+        -80
+      ],
+      "id": "99b2a437-ca3d-4c62-a7a0-fe7ba8a455fa",
+      "name": "HTTP Request1"
+    }
+  ],
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0f60a08dfaa65cda43e89dccf2def56dace8ea615201c8a5843fb404fb52e58"
+  }
+}
+
+<N8nWorkflow data={Enrichissement}/>
+
+#### 3. Stockage dans NocoDB
+
+Les prospects qualifiés (avec emails vérifiés et numéros de téléphone) sont automatiquement ajoutés dans NocoDB. Cette base de données sert de référentiel central pour vos commerciaux, accessible et facile à manipuler.
+
+#### 4. Segmentation et Envoi de Campagnes (Brevo)
+
+Une fois la base constituée, les contacts sont segmentés par catégorie (ex: Hôtellerie, Restauration, etc.) pour envoyer des messages ultra-ciblés.
+
+*   **Warm-up** : Le workflow gère l'envoi progressif (ex: commencer par 5-10 emails/jour) pour "chauffer" l'adresse IP et éviter le dossier spam.
+*   **Templates dynamiques** : Utilisation de modèles d'emails personnalisés selon la typologie du client.
+
+export const Prospection =
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -864,
+        816
+      ],
+      "id": "8bca1a10-7c3b-43b3-acc7-fb586e344927",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 22,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        32
+      ],
+      "id": "bd5379e5-e70d-46cd-b75d-ab1a1bd05a8b",
+      "name": "Brevo1",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 21,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        240
+      ],
+      "id": "80d0729e-b3c8-4578-b2a4-83d3d4a4e803",
+      "name": "Brevo2",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 1,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        432
+      ],
+      "id": "2b2c6ced-ebc5-45a5-806f-5b9851f473a3",
+      "name": "Brevo3",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 13,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        624
+      ],
+      "id": "88521717-bf6c-4a00-9018-ea1dc46f18cf",
+      "name": "Brevo11",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 4,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        816
+      ],
+      "id": "c8d5e826-e7a3-4e8f-a486-2fce31664108",
+      "name": "Brevo12",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 3,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1008
+      ],
+      "id": "9e4f5874-c909-4dbe-8c99-96f827709375",
+      "name": "Brevo14",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 18,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1200
+      ],
+      "id": "1469c37c-e79c-4d48-98c9-d0ef3589ce82",
+      "name": "Brevo23",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 20,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1584
+      ],
+      "id": "5364560b-5add-46cb-8073-28d9e6257dbd",
+      "name": "Brevo24",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendTemplate",
+        "templateId": 19,
+        "receipients": "={{ $json.Email }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.sendInBlue",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1392
+      ],
+      "id": "945b2967-b578-42e0-b261-2103fb4ebeeb",
+      "name": "Brevo25",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e718c2b5-5df7-4951-9861-a2999058a98a",
+                    "leftValue": "={{ $json['Catégorie'].value }}",
+                    "rightValue": "Salle de sport",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0123e76b-2b6f-40fa-ae8d-fd4cfa88d2ad",
+                    "leftValue": "={{ $json['Catégorie'].value }}",
+                    "rightValue": "Restaurants",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3261660-69eb-437b-802e-329a36b95300",
+                    "leftValue": "={{ $json['Catégorie'].value }}",
+                    "rightValue": "Surf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -192,
+        208
+      ],
+      "id": "3766b83b-3559-40f7-96ab-a007e30a409e",
+      "name": "Liste France"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e718c2b5-5df7-4951-9861-a2999058a98a",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Salle de sport",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0123e76b-2b6f-40fa-ae8d-fd4cfa88d2ad",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Restaurants",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3261660-69eb-437b-802e-329a36b95300",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Sport de combat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -192,
+        1376
+      ],
+      "id": "d03ef6ee-c859-4346-96ef-e73d57806a79",
+      "name": "Liste Allemagne"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e718c2b5-5df7-4951-9861-a2999058a98a",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Salle de sport",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0123e76b-2b6f-40fa-ae8d-fd4cfa88d2ad",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Restaurants",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3261660-69eb-437b-802e-329a36b95300",
+                    "leftValue": "={{ $json[\"Catégorie\"].value }}",
+                    "rightValue": "Sport de combat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -192,
+        800
+      ],
+      "id": "a2f4f3ae-0003-4f28-a688-60555b4b6dbd",
+      "name": "Liste Suisse"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "limit": 10,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -640,
+        240
+      ],
+      "id": "065b21c2-5e0b-4fe4-a901-8eeffe2ee370",
+      "name": "Get many rows",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "fieldsUi": {
+          "fieldValues": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        240
+      ],
+      "id": "5899b7ca-02e8-4837-a602-332382e02aba",
+      "name": "Update a row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -640,
+        816
+      ],
+      "id": "705d51c8-4da7-4381-9eca-09b2497eb36a",
+      "name": "Get many rows3",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "fieldsUi": {
+          "fieldValues": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        816
+      ],
+      "id": "e4a8caf9-a88e-4d6a-99f5-9ae51adcb9c6",
+      "name": "Update a row3",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -640,
+        1392
+      ],
+      "id": "326771f8-0f78-45eb-8ffd-a6133e99ca16",
+      "name": "Get many rows4",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "fieldsUi": {
+          "fieldValues": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -416,
+        1392
+      ],
+      "id": "9168a59b-6651-4df9-ad93-21f8da5f0c15",
+      "name": "Update a row4",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liste France": {
+      "main": [
+        [
+          {
+            "node": "Brevo1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liste Allemagne": {
+      "main": [
+        [
+          {
+            "node": "Brevo23",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo25",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo24",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liste Suisse": {
+      "main": [
+        [
+          {
+            "node": "Brevo11",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo12",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brevo14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Liste France",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows3": {
+      "main": [
+        [
+          {
+            "node": "Update a row3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row3": {
+      "main": [
+        [
+          {
+            "node": "Liste Suisse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows4": {
+      "main": [
+        [
+          {
+            "node": "Update a row4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row4": {
+      "main": [
+        [
+          {
+            "node": "Liste Allemagne",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0f60a08dfaa65cda43e89dccf2def56dace8ea615201c8a5843fb404fb52e58"
+  }
+}
+
+<N8nWorkflow data={Prospection}/>
+
+#### 5. Reporting et Relance
+
+Le système ne s'arrête pas à l'envoi. Il surveille les interactions pour affiner la stratégie :
+
+*   **Analyses des retours** : Tracking des ouvertures et des clics (liens vers site ou landing page).
+*   **Gestion de la réputation** : Exclusion automatique des "hard bounces", des désinscriptions ou des signalements spam.
+*   **Stratégie de relance** : Les prospects ayant ouvert ou cliqué (signes d'intérêt) sont identifiés pour une relance prioritaire ou une prise de contact directe par téléphone.
+
+export const Reporting=
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "clicks",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "055e13d5-9c04-4ca3-b9f8-46e693a591a6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cliqué"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ec55a8b9-03b5-46c9-a3bb-9f93fb65ccc7",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "spam",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "spam"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c0bebd18-e855-44bc-a08e-cee900f925a5",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "opened",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ouvert"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "021336ae-8bad-45c2-8f72-4c12850ef2e6",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "hardBounces",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "hardbounce"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "bc1977de-24fa-425f-9b75-7d31860addb6",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "=unsubscribed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unsubscribed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -352,
+        464
+      ],
+      "id": "e6a14d85-9b3f-4ceb-8250-9ad438cab05a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "https://api.brevo.com/v3/smtp/statistics/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "sendInBlueApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "2500"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            },
+            {
+              "name": "startDate",
+              "value": "={{ $now.minus(20,'days').format('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "endDate",
+              "value": "={{ $now.format('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "sort",
+              "value": "desc"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -784,
+        512
+      ],
+      "id": "a440951a-95aa-4661-a070-fea7bfde9429",
+      "name": "HTTP Request",
+      "credentials": {
+        "sendInBlueApi": {
+          "id": "1Z8uETrwXBRFpkJn",
+          "name": "Brevo account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "events",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        512
+      ],
+      "id": "a0946c70-0c6b-4d46-b879-ab4777a404e0",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2,
+              "triggerAtMinute": 40
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1024,
+        512
+      ],
+      "id": "2cf4ba63-94e2-4c54-82f4-f43ed5e2cbb5",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5"
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        96,
+        320
+      ],
+      "id": "f9a34ae5-8259-4f63-9a79-9f0c57d0acd8",
+      "name": "Update a row",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "fields": [],
+          "where": "(id,eq"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        704
+      ],
+      "id": "2322e45f-8212-497b-b63c-f0cd0567bd43",
+      "name": "Hardbounce",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "fields": [],
+          "where": "(id,eq"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        896
+      ],
+      "id": "43ab3e8d-f8f3-4ab1-b14f-e40ef14e3071",
+      "name": "Desinscrit",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "fields": [],
+          "where": "(id,eq"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        128
+      ],
+      "id": "9d5a2275-4302-48e2-9b16-b73964582152",
+      "name": "Cliqué",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "fields": [],
+          "where": "(id,eq"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        320
+      ],
+      "id": "2dc798ea-aac3-404e-aae1-2be03a911f19",
+      "name": "Spam",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5",
+        "options": {
+          "fields": [],
+          "where": "(id,eq"
+        }
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        512
+      ],
+      "id": "57068c95-bcf6-41c9-9863-dd8c312b05a2",
+      "name": "Ouvert",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5"
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        96,
+        512
+      ],
+      "id": "f1a61c47-5ecf-4349-b8a2-4d4e47d55a2a",
+      "name": "Update a row1",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5"
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        96,
+        704
+      ],
+      "id": "cde84537-b649-4628-893b-9abb956d943b",
+      "name": "Update a row2",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5"
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        96,
+        896
+      ],
+      "id": "ec99ecb3-67fa-404b-b129-901c70cb6616",
+      "name": "Update a row3",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pzqmpnp596wteqy",
+        "table": "m6j9w9ov2nh8ww5"
+      },
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        96,
+        128
+      ],
+      "id": "fd369b61-9bbc-4d25-8e56-348084cba885",
+      "name": "Update a row4",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "ggcYSw6UF1t4Q7Zz",
+          "name": "NocoDB Token account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Cliqué",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Spam",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ouvert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hardbounce",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Desinscrit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hardbounce": {
+      "main": [
+        [
+          {
+            "node": "Update a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Desinscrit": {
+      "main": [
+        [
+          {
+            "node": "Update a row3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cliqué": {
+      "main": [
+        [
+          {
+            "node": "Update a row4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spam": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ouvert": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "e0f60a08dfaa65cda43e89dccf2def56dace8ea615201c8a5843fb404fb52e58"
+  }
+}
+
+<N8nWorkflow data={Reporting}/>
+
+### Les Avantages de ce Système
+
+Ce workflow offre une solution "Low Cost" mais redoutablement efficace pour l'acquisition client :
+
+1.  **Coût maîtrisé** : Pas d'abonnement mensuel élevé, vous payez à la consommation via l'API Outscraper.
+2.  **Données fraîches** : Les données proviennent de Google Maps en temps réel, garantissant une meilleure fiabilité que des bases de données statiques achetées.
+3.  **Délivrabilité protégée** : Grâce au nettoyage et à la validation rigoureuse des emails en amont.
+4.  **Automatisation totale** : De la recherche du prospect jusqu'au reporting de campagne, tout est géré par le workflow, libérant du temps pour la vente pure.

@@ -1,0 +1,1475 @@
+---
+title: Créer un CRM sur mesure pour une micro-influenceuse
+description: L'objectif est simple, reprendre le controle sur son audience et fidéliser sa communauté
+repository: chronark/chronark.com
+url: https://chronark.com
+date: 2023-03-28
+published: true
+---
+
+Quelle est la problématique ?
+-----------------------------
+
+Le problème est simple.  
+  
+Une micro-influenceuse affiliée à une grande marque de cosmétique ne peut pas avoir la main sur ces clientes “ou affiliés” qui commandent via son lien.  
+  
+Elle souhaiterait pouvoir avoir un outil lui permettant d’avoir une vue globale de ces clientes afin de pouvoir les recontacter et les recontacter.
+
+### Par où commencer ?
+
+Cela est possible grâce à une entrée de donnée qui provient du mail de confirmation de commande de l’entreprise de cosmétique auquel la cliente est affilié.  
+Voici les informations que l’on y voit dans le mail :
+
+*   Nom et prénom
+    
+*   Email de la cliente ayant fait l’achat
+    
+*   Produit acheté avec identifiant unique
+    
+*   Total de la vente
+    
+*   Total de la commission
+    
+
+Voici le workflows qui permet de récupérer ces informations provenant du mail :
+
+export const MainWorkflow = {
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const rawHtml = $input.first().json.html || \"\"; // remplace 'body' par le champ contenant le contenu HTML de ton email\n\n  // Supprimer les balises &lt;script&gt; et leur contenu\n  let cleaned = rawHtml.replace(/&lt;script[\\s\\S]*?&gt;[\\s\\S]*?&lt;\\/script&gt;/gi, '');\n\n  // Supprimer les balises &lt;style&gt; et leur contenu\n  cleaned = cleaned.replace(/&lt;style[\\s\\S]*?&gt;[\\s\\S]*?&lt;\\/style&gt;/gi, '');\n\n  // Supprimer toutes les balises HTML\n  cleaned = cleaned.replace(/&lt;\\/?[^&gt;]+(&gt;|$)/g, '');\n\n  // Supprimer les entités HTML (ex: &nbsp;)\n  cleaned = cleaned.replace(/&amp;[a-z]+;/gi, ' ');\n\n  // Nettoyage final (trim et espaces multiples)\n  cleaned = cleaned.replace(/\\s+/g, ' ').trim();\n\n  // Ajout du contenu nettoyé dans un nouveau champ\n  item.json.cleanedText = cleaned;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3920,
+        544
+      ],
+      "id": "5d330c1c-83bc-41e2-ae33-0d4cb9a04333",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "responseFormat": "json_object"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -3696,
+        768
+      ],
+      "id": "21561169-c3cd-4916-861c-7d971d35f0a4",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "gywKxbTq7KHDvMuu",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Your task is to parse this text to retrieve these specific information from the order confirmation. \n\nPlease follow strictly these information. \n\nYou're tasked to retrieve the name of the customer. \n. \n\nThe email always start like this :\n(Name of the customer) a passé une commande sur votre site Younique\n\nYou need to retrieve the :\n- name\n- first name\n- email adress of the customer\n- total commission \n- total of the order\n- total redevance\n- list of all product and their product series number. \nIf this is a subscription or a simple order.You have the information in the text\n\nThe product series number always started by capital letterer like US-(number)-(number)\n\nhere is the json format you need to follow precisely. \n\n{\n  \"redevance\": 18.56,\n  \"total\": 45.8,\n  \"commission\": 8.98,\n  \"abonnement\": false,\n  \"produits\": [\n    {\n      \"nom\": \"gloss mascara noir\",\n      \"numero_serie\": \"GMN-001\"\n    },\n    {\n      \"nom\": \"illiminateur gloss\",\n      \"numero_serie\": \"IG-002\"\n    }\n  ],\n  \"numero_commande\": \"46110458\",\n  \"nom\": \"Jacquelot\",\n  \"prenom\": \"Yvette\",\n  \"email\": \"teswdd@gmail.com\"\n}\n\n\n-----\n\nHere is the text you need to analyse.\n\n {{ $json.cleanedText }}\n----\n{{ $json.headers.subject }}\n\nThis subject determine if this is a subscription or order",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -3696,
+        544
+      ],
+      "id": "64bb1466-1b27-439d-a3ae-a181180fdbef",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"redevance\": 18.56,\n  \"total\": 45.8,\n  \"commission\": 8.98,\n  \"abonnement\": false,\n  \"produits\": [\n    {\n      \"nom\": \"gloss mascara noir\",\n      \"numero_serie\": \"GMN-001\"\n    },\n    {\n      \"nom\": \"illiminateur gloss\",\n      \"numero_serie\": \"IG-002\"\n    }\n  ],\n  \"numero_commande\": \"46110458\",\n  \"nom\": \"Jacquelot\",\n  \"prenom\": \"Yvette\",\n  \"email\": \"teswdd@gmail.com\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -3568,
+        768
+      ],
+      "id": "d95c8d62-84de-4fbd-920c-6f8e8e43c439",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "is:unread from:(no-reply@youniqueproducts.com) subject:(Confirmation d'abonnement Younique !)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -4144,
+        448
+      ],
+      "id": "11b4716b-786c-4db0-b5cd-3d022e542aec",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "roarVzszoNheCByq",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "is:unread from:(no-reply@youniqueproducts.com) subject:(Confirmation de commande Younique !)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -4144,
+        640
+      ],
+      "id": "6298ecd1-a8cc-4f6e-8ef1-99556ca7c84d",
+      "name": "Gmail Trigger1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "roarVzszoNheCByq",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "order",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.output.email.toLowerCase() }}"
+            },
+            {
+              "fieldId": "nom",
+              "fieldValue": "={{ $json.output.nom.toSentenceCase() }}"
+            },
+            {
+              "fieldId": "prenom",
+              "fieldValue": "={{ $json.output.prenom.toSentenceCase() }}"
+            },
+            {
+              "fieldId": "commission",
+              "fieldValue": "={{ $json.output.commission ?? 0 }}"
+            },
+            {
+              "fieldId": "redevance",
+              "fieldValue": "={{ $json.output.redevance }}"
+            },
+            {
+              "fieldId": "total",
+              "fieldValue": "={{ $json.output.total }}"
+            },
+            {
+              "fieldId": "products",
+              "fieldValue": "={{ $json.output.produits }}"
+            },
+            {
+              "fieldId": "number_product",
+              "fieldValue": "={{ $json.output.produits.length }}"
+            },
+            {
+              "fieldId": "date",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "numero_de_commandes",
+              "fieldValue": "={{ $json.output.numero_commande }}"
+            },
+            {
+              "fieldId": "abonnement",
+              "fieldValue": "={{ $json.output.abonnement }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3344,
+        544
+      ],
+      "id": "63252df1-e996-47bf-874a-5394a6b0d2ea",
+      "name": "Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7329a662-fb9f-4774-b7e4-30f930f30a86",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4144,
+        224
+      ],
+      "id": "7751ba17-9b75-44d0-a004-f6426a91f2e4",
+      "name": "Webhook",
+      "webhookId": "7329a662-fb9f-4774-b7e4-30f930f30a86"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    },
+                    "id": "dec40e12-0675-4552-8aac-5caf0e2d719b"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "09066fff-ab00-425e-a6c4-b4fbdf84f4e4",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -3696,
+        224
+      ],
+      "id": "1fda92f7-7f76-492f-97ed-dc357f05c944",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.body.record.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3920,
+        224
+      ],
+      "id": "00b497df-7da4-473b-809e-fdabd4c75e02",
+      "name": "Check client",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.email.toLowerCase() }}"
+            },
+            {
+              "fieldId": "nom",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.nom }}"
+            },
+            {
+              "fieldId": "prenom",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.prenom }}"
+            },
+            {
+              "fieldId": "order_number",
+              "fieldValue": "1"
+            },
+            {
+              "fieldId": "total_red",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.redevance }}"
+            },
+            {
+              "fieldId": "total_com",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.commission }}"
+            },
+            {
+              "fieldId": "total",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.total }}"
+            },
+            {
+              "fieldId": "full_name",
+              "fieldValue": "={{ $('Webhook').item.json.body.record.prenom.toSentenceCase() }} {{ $('Webhook').item.json.body.record.nom.toSentenceCase() }}"
+            },
+            {
+              "fieldId": "customers_created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "last_order",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3472,
+        224
+      ],
+      "id": "c37a2e21-42bf-47f5-85be-fe2fa723fe3a",
+      "name": "Create client",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "54dd7803-1cd0-4320-a8d4-a453ab617e03",
+              "name": "body.record.products",
+              "value": "={{ $json.body.record.products }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3696,
+        -32
+      ],
+      "id": "2921f255-111f-4391-b7c6-2c68377e81eb",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.record.products",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3472,
+        -32
+      ],
+      "id": "3461f731-abce-4ad7-b269-9901a1b4da48",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -3248,
+        -32
+      ],
+      "id": "869994b1-a531-4899-9492-582f933a50d2",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "products_younique",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "younique_id",
+              "keyValue": "={{ $json.numero_serie }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3024,
+        -272
+      ],
+      "id": "818e29db-1a3e-47ee-8584-6c4ff8603b62",
+      "name": "Supabase1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "=",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "f90dd1e2-de19-4844-8a64-402ffc537a9b"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "192c4fad-8031-4557-afe7-0985e938261b",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -2800,
+        -272
+      ],
+      "id": "c7d1054c-0d1f-4c45-b261-cb18ddadae97",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('Webhook2').item.json.body.record.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2576,
+        -176
+      ],
+      "id": "0caa2b95-055a-4397-afce-74f6529fd4e8",
+      "name": "Supabase3",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "customers",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('Webhook1').item.json.body.record.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2576,
+        -368
+      ],
+      "id": "90798b6e-94d6-4660-9b01-d2809f7713da",
+      "name": "Supabase4",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "product_order",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "order_id",
+              "fieldValue": "={{ $('Webhook1').item.json.body.record.id }}"
+            },
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $('Supabase1').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        -176
+      ],
+      "id": "983e6b01-7ede-4366-8003-43c95ecdb94c",
+      "name": "Product_order",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "product_customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Supabase3').item.json.id }}"
+            },
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2128,
+        -16
+      ],
+      "id": "2103273f-53d1-4741-a700-145bf2fa66f2",
+      "name": "product_customers",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "product_order",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "order_id",
+              "fieldValue": "={{ $('Webhook1').item.json.body.record.id }}"
+            },
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $('Supabase1').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2352,
+        -368
+      ],
+      "id": "df110f54-bb24-48a4-ad3a-aab8aa3620cb",
+      "name": "Product_order1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "product_customers",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "customer_id",
+              "fieldValue": "={{ $('Supabase4').item.json.id }}"
+            },
+            {
+              "fieldId": "product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2128,
+        -208
+      ],
+      "id": "d2c0582b-f26e-4293-b4c6-bf8ac742dfb4",
+      "name": "product_customers1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -3920,
+        -32
+      ],
+      "id": "cf545571-da3b-4c04-aeb1-b03d05bfc610",
+      "name": "Wait",
+      "webhookId": "5183b8dd-f460-4844-9f8a-9ea414026c9c"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "7aaaa99d-b083-4c17-bb7f-1dc3684ba304",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4144,
+        -32
+      ],
+      "id": "7be8fc9e-a749-4e4b-8cb0-af3d40e64193",
+      "name": "Webhook1",
+      "webhookId": "7aaaa99d-b083-4c17-bb7f-1dc3684ba304"
+    }
+  ],
+  "connections": {
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Create client",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Check client": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create client": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Supabase1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase1": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Supabase4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase3": {
+      "main": [
+        [
+          {
+            "node": "Product_order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase4": {
+      "main": [
+        [
+          {
+            "node": "Product_order1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product_order": {
+      "main": [
+        [
+          {
+            "node": "product_customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product_customers": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product_order1": {
+      "main": [
+        [
+          {
+            "node": "product_customers1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "product_customers1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2f71d9d9d0bf3c859adc61b62c8239f56967b91d126465db02b9e8b8ff49126d"
+  }
+};
+
+<N8nWorkflow data={MainWorkflow} />
+
+
+### Comment ça fonctionne ?
+
+Chaque email provenant d’une confirmation de commandes ou d’une confirmation d’abonnement est “parsé” pour y entrer dans la base de données.  
+  
+Pour obtenir toutes les informations, nous devons vérifier si client existe bien, s’il existe. Nous devons mapper correctement les données.  
+  
+Si ce n’est pas le cas, nous devons créer le client dans la base de données.  
+  
+Pareil pour les produits.  
+  
+Voici un mind map simple pour que vous puissiez comprendre le système
+
+<Whimsical url="https://whimsical.com/crm-from-email-parsing-WL9qQWVE11EccBeza42WXg" />
+
+Mais quelle est la plus-value pour le client ?
+----------------------------------------------
+
+Effectivement, avoir une base de données sans pouvoir en tirer quelque chose est inutile.  
+  
+C’est pour ça que le travail ne consiste pas forcément à avoir une base de données. Mais de pouvoir la transformer en données fiables et pertinentes pour accroitre la croissance.
+
+###   
+Connaitre son “Top 10 clientes” et “Top produit du mois”.
+
+![Screenshot 2025-10-31 at 14.05.32](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/8854db89-1d11-4fb1-5e39-6e052c3ab700/public "Screenshot 2025-10-31 at 14.05.32")
+
+Un workflow n8n "Reporting” est également créé pour permettre de communiquer par mail les meilleurs clientes et produits.
+
+####   
+Top Produits Reporting :
+
+export const productWorkflow = {
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 20,
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -32
+      ],
+      "id": "3806302a-b6c2-4369-8873-a097db9a77c4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -128
+      ],
+      "id": "227bbb18-9782-472c-8acf-803ff5ed0d49",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "32ab53a7-9584-42bf-9316-28820b68da05",
+              "name": "data",
+              "value": "={{ $json.data.slice(0, 10).sort() }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -128
+      ],
+      "id": "d9deebb1-0a35-426a-8b99-545d7f028bdc",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "subject": "Top Produit du mois",
+        "message": "=<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html\n\txmlns=\"http://www.w3.org/1999/xhtml\">\n\t<head>\n\t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n\t\t<title>Younique Par Elisa - Top 5 Products</title>\n\t\t<style type=\"text/css\">         body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }         table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }         body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; font-family: 'Arial', sans-serif; }         .product-card {             background-color: #ffffff;             border: 1px solid #FFB6C1;             border-radius: 15px;             margin-bottom: 20px;             box-shadow: 0 4px 6px rgba(255,105,180,0.1);             overflow: hidden;         }         .product-header {             background-color: #FFF0F5;             color: #FF1493;             padding: 15px;             font-size: 20px;             font-weight: bold;             text-align: center;             border-bottom: 1px solid #FFB6C1;         }         .product-content {             padding: 20px;         }         .product-name {             color: #FF1493;             font-size: 22px;             margin-bottom: 10px;             font-weight: bold;         }         .product-sales {             color: #666;             font-size: 18px;             text-align: right;         }     </style>\n\t</head>\n\t<body style=\"margin: 0; padding: 0; background-color: #ffffff;\">\n\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"max-width: 600px; margin: 0 auto;\">\n\t\t\t<tr>\n\t\t\t\t<td style=\"padding: 20px 0; text-align: center; background-color: #FFF0F5;\">\n\t\t\t\t\t<h1 style=\"color: #FF69B4; margin: 0;\">Younique Par Elisa</h1>\n\t\t\t\t\t<p style=\"color: #666; margin: 5px 0 0;\">Top 5 Best-Selling Products</p>\n\t\t\t\t</td>\n\t\t\t</tr>\n\t\t\t<tr>\n\t\t\t\t<td style=\"padding: 30px 20px; background-color: #ffffff;\">\n\t\t\t\t\t<!-- Product 1 -->\n\t\t\t\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"product-card\">\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-header\">                             #1 Best Seller                         </td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-content\">\n\t\t\t\t\t\t\t\t<table width=\"100%\">\n\t\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-name\">{{ $json.data[0].name }}</td>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-sales\" align=\"right\">{{ $json.data[0].sales_count }} Vendu</td>\n\t\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t</table>\n\t\t\t\t\t<!-- Product 2 -->\n\t\t\t\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"product-card\" style=\"background-color: #FFF0F5;\">\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-header\">                             #2 Top Performer                         </td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-content\">\n\t\t\t\t\t\t\t\t<table width=\"100%\">\n\t\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-name\">{{ $json.data[1].name }} </td>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-sales\" align=\"right\"> {{ $json.data[1].sales_count }} Vendu</td>\n\t\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t</table>\n\t\t\t\t\t<!-- Product 3 -->\n\t\t\t\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"product-card\">\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-header\">                             #3 Customer Favorite                         </td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-content\">\n\t\t\t\t\t\t\t\t<table width=\"100%\">\n\t\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-name\">{{ $json.data[2].name }}</td>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-sales\" align=\"right\">{{ $json.data[2].sales_count }} Vendu</td>\n\t\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t</table>\n\t\t\t\t\t<!-- Product 4 -->\n\t\t\t\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"product-card\" style=\"background-color: #FFF0F5;\">\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-header\">                             #4 Rising Star                         </td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-content\">\n\t\t\t\t\t\t\t\t<table width=\"100%\">\n\t\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-name\">{{ $json.data[3].name }}</td>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-sales\" align=\"right\">{{ $json.data[3].sales_count }} Vendu</td>\n\t\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t</table>\n\t\t\t\t\t<!-- Product 5 -->\n\t\t\t\t\t<table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"product-card\">\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-header\">                             #5 Most Versatile                         </td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t<td class=\"product-content\">\n\t\t\t\t\t\t\t\t<table width=\"100%\">\n\t\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-name\">{{ $json.data[4].name }}</td>\n\t\t\t\t\t\t\t\t\t\t<td class=\"product-sales\" align=\"right\">{{ $json.data[4].sales_count }} Vendu</td>\n\t\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t</tr>\n\t\t\t\t\t</table>\n\t\t\t\t</td>\n\t\t\t</tr>\n\t\t\t<tr>\n\t\t\t\t<td style=\"background-color: #FFF0F5; padding: 20px; text-align: center; color: #666;\">\n\t\t\t\t\t<p style=\"margin: 0;\">© 2025 Younique Par Elisa. All rights reserved.</p>\n\t\t\t\t</td>\n                    </tr>\n                </table>\n\t</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        896,
+        -128
+      ],
+      "id": "c44d06f3-a7a3-4283-a12e-fc7981895f1e",
+      "name": "Gmail",
+      "webhookId": "9790d143-96db-4695-aad7-517fb1345bfa",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "roarVzszoNheCByq",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://rthpmurcdqemgjbsxovz.supabase.co/rest/v1/best_selling_products_this_month?select=*&order=sales_count.desc",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        -128
+      ],
+      "id": "4e73d732-154e-41e0-9cee-18dd4a57a322",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "I9vsaexJB8zdii7p",
+          "name": "Outscraper"
+        },
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 30,
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -224
+      ],
+      "id": "fd94b442-43d4-4d33-ac71-c8a5563e490e",
+      "name": "Schedule Trigger1"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2f71d9d9d0bf3c859adc61b62c8239f56967b91d126465db02b9e8b8ff49126d"
+  }
+};
+
+<N8nWorkflow data={productWorkflow} />
+
+#### Top Client reporting :
+
+export const clientWorkflow = {
+  "nodes": [
+    {
+      "parameters": {
+        "subject": "Top Cliente du mois!",
+        "message": "=<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<meta charset=\"UTF-8\">\n\t\t\t<style>         body {             font-family: Arial, sans-serif;             line-height: 1.6;             max-width: 600px;             margin: 0 auto;             padding: 20px;             color: #4a4a4a;             background-color: #faf8f7;         }         .header {             background-color: #ffd1dc;             color: #4a4a4a;             padding: 20px;             border-radius: 8px;             margin-bottom: 20px;             text-align: center;             box-shadow: 0 2px 4px rgba(0,0,0,0.1);         }         .client-table {             width: 100%;             border-collapse: collapse;             margin: 20px 0;             background-color: #fff;             border-radius: 8px;             overflow: hidden;         }         .client-table th {             background-color: #ffe4e9;             padding: 12px;             text-align: left;             border-bottom: 2px solid #ffd1dc;             color: #4a4a4a;         }         .client-table td {             padding: 12px;             border-bottom: 1px solid #ffe4e9;         }         .top-client {             background-color: #fff0f3;         }         .summary {             background-color: #fff;             padding: 15px;             border-radius: 8px;             margin-top: 20px;             border: 1px solid #ffd1dc;         }         h1 {             color: #4a4a4a;             margin: 0;         }         p {             color: #4a4a4a;         }         ul {             color: #4a4a4a;         }         .client-table tr:hover {             background-color: #fff8f9;         }     </style>\n\t\t</head>\n\t\t<body>\n\t\t\t<div class=\"header\">\n\t\t\t\t<h1>Top Clients</h1>\n\t\t\t</div>\n\t\t\t<p>Classement des meilleures clientes</p>\n\t\t\t<table class=\"client-table\">\n\t\t\t\t<thead>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<th>Classement</th>\n\t\t\t\t\t\t<th>Nom</th>\n\t\t\t\t\t\t<th>Prénom</th>\n\t\t\t\t\t\t<th>Email</th>\n\t\t\t\t\t\t<th>Commandes</th>\n\t\t\t\t\t</tr>\n\t\t\t\t</thead>\n\t\t\t\t<tbody>\n\t\t\t\t\t<tr class=\"top-client\">\n\t\t\t\t\t\t<td>1</td>\n\t\t\t\t\t\t<td>{{ $json.data[0].nom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[0].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[0].email }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[0].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>2</td>\n\t\t\t\t\t\t<td>  {{ $json.data[1].nom }} </td>\n\t\t\t\t\t\t<td>{{ $json.data[1].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[1].email }}</td>\n\t\t\t\t\t\t    <td>{{ $json.data[1].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>3</td>\n\t\t\t\t\t\t<td>  {{ $json.data[2].nom }} </td>\n\t\t\t\t\t\t<td>{{ $json.data[2].prenom}}</td>\n\t\t\t\t\t\t<td>{{ $json.data[2].email }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[2].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>4</td>\n\t\t\t\t\t\t<td>  {{ $json.data[3].nom }} </td>\n\t\t\t\t\t\t<td>{{ $json.data[3].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[3].email }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[3].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>5</td>\n\t\t\t\t\t\t<td>  {{ $json.data[4].nom }}  </td>\n\t\t\t\t\t\t<td>{{ $json.data[4].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[4].email}}</td>\n\t\t\t\t\t\t<td>{{ $json.data[4].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>6</td>\n\t\t\t\t\t\t<td> {{ $json.data[5].nom }}   </td>\n\t\t\t\t\t\t<td>{{ $json.data[5].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[5].email }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[5].order_count}}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>7</td>\n\t\t\t\t\t\t<td>  {{ $json.data[6].nom }}  </td>\n\t\t\t\t\t\t<td>{{ $json.data[6].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[6].email }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[6].order_count}}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>8</td>\n\t\t\t\t\t\t<td> {{ $json.data[7].nom }}   </td>\n\t\t\t\t\t\t<td>{{ $json.data[7].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[7].email}}</td>\n\t\t\t\t\t\t<td>{{ $json.data[7].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>9</td>\n\t\t\t\t\t\t<td>   {{ $json.data[8].nom }}   </td>\n\t\t\t\t\t\t<td>{{ $json.data[8].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[8].email }} </td>\n\t\t\t\t\t\t<td>{{ $json.data[8].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n\t\t\t\t\t\t<td>10</td>\n\t\t\t\t\t\t<td>  {{ $json.data[9].nom }}   </td>\n\t\t\t\t\t\t<td>{{ $json.data[9].prenom }}</td>\n\t\t\t\t\t\t<td>{{ $json.data[9].email }} </td>\n\t\t\t\t\t\t<td>{{ $json.data[9].order_count }}</td>\n\t\t\t\t\t</tr>\n\t\t\t\t</tbody>\n\t\t\t</table>\n\t\t\t<div class=\"summary\">\n\t\t\t\t<p>\n\t\t\t\t\t<strong>Points clés :</strong>\n\t\t\t\t</p>\n\t\t\t\t<p>Merci à toute l'équipe pour vos efforts qui nous permettent d'atteindre de tels résultats.</p>\n\t\t\t</div>\n\t\t</body>\n\t</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        -80
+      ],
+      "id": "439900ae-8198-4b79-ba68-e4c89778091c",
+      "name": "Gmail",
+      "webhookId": "566a11f8-7bef-40e1-bc7b-cae265199326",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "roarVzszoNheCByq",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -80
+      ],
+      "id": "636e88d3-054a-401b-b4ef-d08a736f521f",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 20,
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        16
+      ],
+      "id": "aa093d60-bea4-4fd5-b9cd-74e3e4e4f58f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://rthpmurcdqemgjbsxovz.supabase.co/rest/v1/top_clients_current_month?select=*&order=order_count.desc",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        -80
+      ],
+      "id": "d72c6985-a2e6-4fb5-88a2-b8165e179769",
+      "name": "HTTP Request",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1G7gtbrPVc9EhVmA",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c6fb6f5c-5f38-44d2-8784-a0898436a34b",
+              "name": "data",
+              "value": "={{ $json.data.slice(0,10) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        -80
+      ],
+      "id": "a92b74c1-c35d-4655-8d4e-d361870c74cc",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 31,
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        -176
+      ],
+      "id": "00f8a6c6-14f2-4fad-8347-021c1543ee37",
+      "name": "Schedule Trigger1"
+    }
+  ],
+  "connections": {
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2f71d9d9d0bf3c859adc61b62c8239f56967b91d126465db02b9e8b8ff49126d"
+  }
+};
+
+<N8nWorkflow data={clientWorkflow} />
+
+### Connaitre la typologie de client en fonction de la catégorie de produit
+
+Un des gros point de douleurs a résoudre avec ce projet est la segmentation des abonnées et acheteuse des produits. 
+En effet, en ayant les produits categorisé et ayant relié les produits par clients de ces derniers.. 
+Nous pouvons ainsi savoir quel typologie de produit est dominant parmis les achats de la clientes. 
+Cela nous permet : 
+
+*   De connaitre la catégorie qui performe le plus
+    
+*   Ségmenter et créer des listes emails pour des campagnes ciblés
+
+
+![Screenshot 2025-10-31 at 14.13.32](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/fcc14284-db1d-479b-d80a-3cb6e3151400/public "Screenshot 2025-10-31 at 14.13.32")
+
+### Exporter en CSV pour faire du mailing avec des filtres pertinents
+
+![Screenshot 2025-10-31 at 14.16.12](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/a583db15-cc53-4880-09de-2e423ba39a00/public "Screenshot 2025-10-31 at 14.16.12")
+
+### Relancer des clientes n’ayant pas encore commandé depuis un certain temps
+
+Grâce à la date de commande, nous pouvons savoir quel cliente/abonnée a stoppé d'être active dans ses achats avec la micro-influenceuse. 
+
+Une page est dedié pour ce cas d'usage ce qui permet aux équipes d'exporter la liste de cliente afin de les contacter ou relancer par email via Instagram grâce au nom et prénom. 
+
+![Screenshot 2025-10-31 at 14.22.25](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/45d7e27d-8c31-4798-cc2e-2caf51880600/public "Screenshot 2025-10-31 at 14.22.25")
+
+
+Pour conclure.

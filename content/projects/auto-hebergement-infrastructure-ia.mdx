@@ -1,0 +1,158 @@
+---
+title: Auto Hébergement d'une infrastructure IA.
+description: Mis en place d'une infrastructure de base de donnée et d'automatisation auto-hébergé. Économie de dépense + contrôle des données. 
+date: "2023-01-16"
+url: https://envshare.dev
+repository: chronark/envshare
+published: true
+---
+
+Comment ça marche ? Qu’est-ce qu’auto-hébergé ?
+-----------------------------------------------
+
+Des solutions autohébergé sont des solutions **digital**es ou logicielle**s** que vous installez et gérer vous-mêmes sur votre propre serveur VPS ou infrastructures web.  
+C’est l’inverse des solutions dites **“_Saas_”** qui sont des solutions hébergées directement sur le serveur de l’éditeur du logiciel.  
+
+### Les **avantages** à (auto-hébergé) n8n, Supabase et Baserow
+
+*   **Contrôle** total de vos données  
+      
+    En effet, avec une solution auto hébergée, vos données ne sont pas stockées sur le serveur de l’éditeur du logiciel. Cela est très important si vous êtes sensibles au niveau de vos données. Notamment si vous stockez des données clients.  
+    
+*   **Cout** réduit.  
+      
+    En ayant une solution auto hébergé, vous n’avez plus besoin de payer mensuelles des outils car vous n’êtes plus connecté au cloud de l’éditeur. (enfin presque, j’explique cela à la suite de ce post). Le seul cout qui permet de faire fonctionner vos outils est celui du serveur VPS ou celle de votre infrastructure.  
+    
+*   **Personnalisation**  
+      
+    Cela vous donne le contrôle du code source et vous permet (Si vous êtes à l’aise) de pourquoi pas rajouter certaines fonctionnalités que vous n’auriez pas pu faire avec le service cloud.  
+    Cela dépend cependant du code source proposé par l’éditeur
+    
+
+### Les inconvénients d’auto hébergé ses propres outils
+
+> “Un grand pouvoir implique de grandes responsabilités”, Marlène Schiappa, Touche pas à mon poste, 2021.
+
+*   **Scalabilité** (_ou Extensibilité de votre infrastructure en bon François)_  
+      
+    Vous êtes en charge des ressources consommé par votre propre serveur et une augmentation soudaine de de ressources peut tout simplement faire sauter votre serveur ou bugger tout simplement.  
+    
+*   **Sécurité** (Le plus important)  
+      
+    Auto hébergé votre structure d’outil est par essence plus sécurisée car vous avez la charge de vos propres données tandis qu’avec un service cloud, vous déléguez cette tâche à l’éditeur.  
+    **Cependant**, un hacker déterminé de voler vos données pourrait, si vous ne mettez pas en places les bonnes solutions, avoir accès à votre serveur et donc vos données.  
+    
+*   **Gestion administrateur**  
+      
+    Il est important de comprendre que TOUT doit être géré par vous. Même les emails et votre nom de domaine. Vous devez donc connecter votre serveur `SMTP` Afin de pouvoir ensuite gérer les utilisateurs de vos outils et invités les membres à travailler avec vous. Cela nécessite tout de même des connaissances et une expertise.
+    
+
+### Pourquoi n8n, Baserow et Supabase ?
+
+Self host n8n, **Baserow** et **Supabase** est très certainement la stack ultime pour :
+
+*   Gérer les automatisations avec n8n
+    
+*   Avoir une base de données no code avec Baserow qui vous permettent de créer votre CRM ou dashboard.
+    
+*   Supabase pour un vrai backend (Stockage de fichier, Auth) ainsi qu’une base de données `vectorisé` qui vous servira en l’intégrant avec n8n.
+    
+
+Avoir une base de données `vectorisé` est vraiment la fonctionnalité qui est game changer avec cette stack.  
+En effet, vous allez pouvoir y inclure vos fichiers, contenu et n’importe quel data que vous voulez et l’utiliser pour vos agents IA avec n8n.
+
+Contrôle total de vos données, même avec l’IA :)
+
+**Attention !** Baserow et n8n sont “**_self-hostable_**” mais ont des offres professionnelles qui vous bloque l’accès à certaines fonctionnalités. Cela reste cependant moins cher que leur offre cloud et vous n’avez pas de limitations en termes de stockage de fichier sur Baserow ou en nombres de ‘rows’.
+
+Comment auto hébergé n8n, Baserow et Supabase sur son propre serveur ?
+----------------------------------------------------------------------
+
+J’utilise Hostinger qui est la solution la plus simple et user-friendly
+
+![Capture d’écran 2025-10-07 à 16.17.19](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/421ce1e3-10ec-488f-9a45-36858e093c00/public "Capture d’écran 2025-10-07 à 16.17.19")
+
+Ensuite, il est nécessaire d’avoir un nom de domaine et une adresse emails professionnelles afin de gérer vos invités.
+
+La structure de votre code doit être ainsi :
+
+```txt
+├── docker-compose.yml
+├── Caddyfile
+├── n8n/
+│   ├── docker-compose.n8n.yml
+│   └── .env.n8n
+├── baserow/
+│   ├── docker-compose.baserow.yml
+│   └── .env.baserow
+└── supabase/
+│   ├── docker-compose.supabase.yml
+│   └── .env.supabase
+```
+
+Cette structure permet de séparer les environnements des outils afin de gérer le deploiement un a un.  
+En claire, si je veux mettre à jour n8n. Je n’ai pas besoin de relancer toute la machine.  
+  
+Uniquement n8n sera mise à jour.
+
+### Comment ajouter mon nom de domaine ?
+
+Caddyfile est le package permettant de gérer le reverse proxy du serveur, et de gérer les urls ou se trouveront tes outils.  
+`Exemple :baserow.ton-nom-de-domaine.com`
+
+Ce package est vraiment très utile et très simple d’utilisation en termes de configuration.  
+  
+Voici un exemple de fichier **_caddy_** qui permet de configurer les sous domaines et nom de domaines ainsi que l’adresse email qui sera utilisé pour gérer les mots de passes et invitations de membres sur vos outils.
+
+```caddy
+{
+    email adresse@nomdedomaine.com
+}
+
+# n8n
+autom.nom-de-domaine.com {
+    reverse_proxy n8n:5678
+## IMPORTANT ! On utilise pas n8n comme sous domaines car Google considère cela comme un site dangereux. C'est un problème connu par les équipes de n8n qui essaie de gérer cela. Cela n'a aucn impact de nommer votre sous domaines 'autom' ou autre mot spécifique. 
+}
+
+# Baserow
+baserow.nom-de-domaine.com {
+    reverse_proxy baserow:80
+}
+
+# Supabase API Gateway
+api.nom-de-domaine.com {
+    reverse_proxy supabase-kong:8000
+}
+
+# Supabase Studio
+studio.nom-de-domaine.com {
+    basicauth / {
+        adresse@nomdedomaine.com $2a$14$8Xz5FpLmQvRtYsWgNkJlOe.3vBcDfGhIjKlMnOpQrStUvWxYzA123
+    }
+    reverse_proxy supabase-studio:3000
+}
+```
+
+### Protéger votre base de données Supabase.
+
+Un problème qui apparait quand on veut déployer en self host supabase.  
+En effet, lorsque vous vous rendez sur `studio.votre-nom-domaine.com` .  
+Vous vous rendez compte que quiconque ayant votre URL a accès à votre base de données.  
+  
+Est-ce sécurisé ?  
+  
+Bien sûr que non.  
+  
+Pour cela, on va configurer une authentification pour quiconque se rend sur cette URL.  
+Cela se gère facilement avec caddy.
+
+Entrez votre adresse emails et encrypter le mot de passe que vous souhaitez avec cette commande sur votre terminale.
+
+`echo -n "ton_mot_de_passe" | openssl dgst -sha256`
+
+![Screenshot 2025-10-07 at 16.13.16](https://imagedelivery.net/lXuc1r5w3ZJxYxyd2kOyfg/de6e7233-e06b-4e51-013f-bf5f16c6c900/public "Screenshot 2025-10-07 at 16.13.16")
+
+Vous aurez ainsi une chaine cryptée vous permettant sécurisé votre mot de passe.
+
+Voilà ce que vous devez savoir pour self host votre propre serveur **n8n**, **baserow** et **supabase** :)
