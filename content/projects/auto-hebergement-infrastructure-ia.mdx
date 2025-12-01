@@ -21,11 +21,11 @@ C’est l’inverse des solutions dites **“_Saas_”** qui sont des solutions 
     
 *   **Cout** réduit.  
       
-    En ayant une solution auto hébergé, vous n’avez plus besoin de payer mensuelles des outils car vous n’êtes plus connecté au cloud de l’éditeur. (enfin presque, j’explique cela à la suite de ce post). Le seul cout qui permet de faire fonctionner vos outils est celui du serveur VPS ou celle de votre infrastructure.  
+    En ayant une solution auto hébergé, vous n’avez plus besoin de payer mensuelles des outils car vous n’êtes plus connecté au cloud de l’éditeur. (enfin presque, j’explique cela à la suite de ce post). Le seul coût est celui du serveur VPS ou de votre infrastructure.  
     
 *   **Personnalisation**  
       
-    Cela vous donne le contrôle du code source et vous permet (Si vous êtes à l’aise) de pourquoi pas rajouter certaines fonctionnalités que vous n’auriez pas pu faire avec le service cloud.  
+    Cela vous permet de contrôler le code source et vous permet (Si vous êtes à l’aise) de pourquoi pas rajouter certaines fonctionnalités que vous n’auriez pas pu faire avec le service cloud.  
     Cela dépend cependant du code source proposé par l’éditeur
     
 
@@ -39,7 +39,7 @@ C’est l’inverse des solutions dites **“_Saas_”** qui sont des solutions 
     
 *   **Sécurité** (Le plus important)  
       
-    Auto hébergé votre structure d’outil est par essence plus sécurisée car vous avez la charge de vos propres données tandis qu’avec un service cloud, vous déléguez cette tâche à l’éditeur.  
+    Auto-héberger votre infrastructure est par essence plus sécurisée car vous avez la charge de vos propres données tandis qu’avec un service cloud, vous déléguez cette tâche à l’éditeur.  
     **Cependant**, un hacker déterminé de voler vos données pourrait, si vous ne mettez pas en places les bonnes solutions, avoir accès à votre serveur et donc vos données.  
     
 *   **Gestion administrateur**  
@@ -97,7 +97,7 @@ Uniquement n8n sera mise à jour.
 
 ### Comment ajouter mon nom de domaine ?
 
-Caddyfile est le package permettant de gérer le reverse proxy du serveur, et de gérer les urls ou se trouveront tes outils.  
+Caddyfile est le fichier de configuration qui permet de gérer le reverse proxy du serveur, et de gérer les urls ou se trouveront tes outils.  
 `Exemple :baserow.ton-nom-de-domaine.com`
 
 Ce package est vraiment très utile et très simple d’utilisation en termes de configuration.  
@@ -147,7 +147,7 @@ Bien sûr que non.
 Pour cela, on va configurer une authentification pour quiconque se rend sur cette URL.  
 Cela se gère facilement avec caddy.
 
-Entrez votre adresse emails et encrypter le mot de passe que vous souhaitez avec cette commande sur votre terminale.
+Entrez votre adresse emails et Chiffrer le mot de passe que vous souhaitez avec cette commande sur votre terminale.
 
 `echo -n "ton_mot_de_passe" | openssl dgst -sha256`
 

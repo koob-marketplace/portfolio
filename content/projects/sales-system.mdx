@@ -1,6 +1,6 @@
 ---
-title: Extraire tous les prospects potentielles de France pour des campagnes emails.
-description: Remplir un fichier client en partant de 0 pour contacter tous les prospects potentielles de France. 
+title: Extraire tous les prospects potentiels de France pour des campagnes emails.
+description: Remplir un fichier client à partir de zéro pour contacter tous les prospects potentiels de France.
 repository: chronark/chronark.com
 url: https://chronark.com
 date: 2023-03-28
@@ -12,7 +12,7 @@ Quelle est la problématique ?
 
 La prospection commerciale peut vite devenir coûteuse et chronophage. Les abonnements aux bases de données de prospects sont souvent onéreux, et la constitution manuelle de fichiers est interminable.
 
-L'objectif est ici de pouvoir extraire et enrichir une base de données clients en moins d'une heure, en ciblant n'importe quel prospect en France, sans abonnement fixe, mais en payant uniquement à la donnée extraite (pay-as-you-go).
+L'objectif est ici d'extraire et d'enrichir une base de données clients en moins d'une heure, en ciblant n'importe quel prospect en France, sans abonnement fixe, mais en payant uniquement à la donnée extraite (pay-as-you-go).
 
 ### La Stack Technique
 
@@ -27,9 +27,9 @@ Ce système repose sur l'orchestration de plusieurs outils performants et écono
 
 #### 1. Paramétrage et Extraction (Google Maps)
 
-Le processus commence par définir une liste de villes cibles (ex: Paris, Marseille, Lyon) et une requête spécifique (ex: "Hôtel").
+Le processus commence par la définition d'une liste de villes cibles (ex. : Paris, Marseille, Lyon) et d'une requête spécifique (ex. : « Hôtel »).
 
-Le workflow boucle sur ces paramètres pour interroger Google Maps via Outscraper. Cela permet de récupérer les fiches entreprises correspondant à la recherche dans les zones géographiques définies.
+Le workflow boucle sur ces paramètres pour interroger Google Maps via Outscraper. Cela permet de récupérer les fiches d'entreprises correspondant à la recherche dans les zones géographiques définies.
 
 export const ScrapingWorkflow = 
 {
@@ -674,13 +674,13 @@ export const ScrapingWorkflow =
 
 #### 2. Enrichissement et Vérification des Données
 
-Une fois les entreprises identifiées, le système procède à plusieurs vérifications cruciales pour qualifier la donnée :
+Une fois les entreprises identifiées, le système effectue plusieurs vérifications cruciales pour qualifier les données :
 
-*   **Vérification du domaine** : On s'assure que l'entreprise possède un site web et un nom de domaine valide.
+*   **Vérification du domaine** : Le système vérifie que l'entreprise possède un site web et un nom de domaine valide.
 *   **Scraping de contacts** : Extraction des adresses emails et numéros de téléphone associés.
 *   **Validation des emails** : Une étape indispensable pour garantir la délivrabilité. Le système vérifie si l'email est valide pour éviter les "bounces" qui pourraient nuire à la réputation de votre domaine d'envoi.
 
-Si aucune adresse email valide n'est trouvée, le prospect est écarté pour ne pas polluer la base de données.
+Si aucune adresse e-mail valide n'est trouvée, le prospect est écarté afin de ne pas polluer la base de données.
 
 export const Enrichissement =
 {

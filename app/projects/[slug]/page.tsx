@@ -28,11 +28,9 @@ export default async function PostPage({ params }: Props) {
     notFound();
   }
 
-  const views = 0;
-
   return (
     <div className="bg-zinc-50 min-h-screen">
-      <Header project={project} views={views} />
+      <Header project={project} />
 
       <article className="px-4 py-12 mx-auto prose prose-zinc prose-quoteless">
         <Mdx code={project.body.code} />
